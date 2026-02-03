@@ -1,0 +1,38 @@
+{
+    "company_name": "McDonald's Corporation",
+    "company_ticker": "MCD",
+    "description": "Global fast-food franchise with negative equity due to aggressive share buybacks and high leverage",
+    
+    "_comment_fixed": "=== FIXED ASSUMPTIONS (Company Strategy/Policy) ===",
+    "_comment_backtest": "Backtest showed: Cash error 305% (company reduced cash significantly), Revenue underestimated 9-11% in Mode1",
+    "lt_loan_years": 15.0,
+    "st_loan_years": 1.0,
+    "pct_financing_with_debt": 0.95,
+    
+    "_comment_overrides": "=== OPTIONAL OVERRIDES (Set to null to use calculated values) ===",
+    "revenue_growth_override": null,
+    "tax_rate_override": null,
+    "payout_ratio_override": null,
+    "cogs_pct_override": null,
+    "sga_pct_override": null,
+    "capex_pct_override": null,
+    "cost_of_debt_override": null,
+    
+    "_comment_bounds": "=== BOUNDS FOR CALCULATED VALUES ===",
+    "min_revenue_growth": 0.02,
+    "max_revenue_growth": 0.08,
+    "min_tax_rate": 0.18,
+    "max_tax_rate": 0.25,
+    "min_depreciation_years": 20.0,
+    "max_depreciation_years": 30.0,
+    
+    "_comment_defaults": "=== FALLBACK DEFAULTS (Only used if historical data unavailable) ===",
+    "default_tax_rate": 0.22,
+    "default_revenue_growth": 0.04,
+    "default_payout_ratio": 0.55,
+    "default_ar_pct": 0.08,
+    "default_inventory_pct": 0.002,
+    "default_ap_pct": 0.05,
+    "default_depreciation_years": 15.0,
+    "default_inflation_rate": 0.025
+}

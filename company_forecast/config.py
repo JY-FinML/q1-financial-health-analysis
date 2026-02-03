@@ -1,66 +1,75 @@
 """
-Company Configuration File
-Defines data paths and parameters for each company
+Configuration module for company financial forecasting.
 """
-import os
 
-# Project root directory
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DATA_DIR = os.path.join(BASE_DIR, 'data')
+from dataclasses import dataclass
+from typing import List
 
-# Company configurations
-COMPANIES = {
-    'ProcterGamble': {
-        'name': 'Procter & Gamble',
-        'ticker': 'PG',
-        'data_path': os.path.join(DATA_DIR, 'ProcterGamble'),
-        'fiscal_year_end': '06-30',  # June 30
-        'base_years': [2022, 2023, 2024],
-        'forecast_years': [2025],
-    },
-    'Costco': {
-        'name': 'Costco Wholesale',
-        'ticker': 'COST',
-        'data_path': os.path.join(DATA_DIR, 'Costco'),
-        'fiscal_year_end': '08-31',  # August 31
-        'base_years': [2022, 2023, 2024],
-        'forecast_years': [2025],
-    },
-    'CocaCola': {
-        'name': 'The Coca-Cola Company',
-        'ticker': 'KO',
-        'data_path': os.path.join(DATA_DIR, 'CocaCola'),
-        'fiscal_year_end': '12-31',  # December 31
-        'base_years': [2021, 2022,2023],
-        'forecast_years': [2024],
-    },
-    'McDonalds': {
-        'name': "McDonald's Corporation",
-        'ticker': 'MCD',
-        'data_path': os.path.join(DATA_DIR, 'McDonalds'),
-        'fiscal_year_end': '12-31',  # December 31
-        'base_years': [2021, 2022, 2023],
-        'forecast_years': [2024],
-    },
-}
 
-# Year-end date mapping
-def get_year_end_dates(company_key: str) -> dict:
-    """Get fiscal year-end dates for the specified company"""
-    config = COMPANIES[company_key]
-    fiscal_end = config['fiscal_year_end']
+@dataclass
+class ForecastConfig:
+    """Configuration for the forecast model"""
     
-    dates = {}
-    all_years = config['base_years'] + config['forecast_years']
+    # Number of years to forecast
+    n_forecast_years: int = 4
     
-    for year in range(min(all_years) - 2, max(all_years) + 1):
-        dates[year] = f"{year}-{fiscal_end}"
+    # Number of historical years to use as input (for calculating averages/trends)
+    n_input_years: int = 3
     
-    return dates
+    # Year labels (will be set based on base year)
+    base_year: int = 2025
+    
+    @property
+    def forecast_years(self) -> List[int]:
+        """Return list of forecast year numbers"""
+        return list(range(1, self.n_forecast_years + 1))
+    
+    @property
+    def all_years(self) -> List[int]:
+        """Return list of all years including Year 0"""
+        return list(range(self.n_forecast_years + 1))
+    
+    @property
+    def year_labels(self) -> List[str]:
+        """Return year labels (e.g., 2025, 2026, 2027, ...)"""
+        return [str(self.base_year + i) for i in range(self.n_forecast_years + 1)]
 
-# Get company configuration
-def get_company_config(company_key: str) -> dict:
-    """Get company configuration"""
-    if company_key not in COMPANIES:
-        raise ValueError(f"Company {company_key} not found. Available: {list(COMPANIES.keys())}")
-    return COMPANIES[company_key]
+
+@dataclass
+class ModelAssumptions:
+    """
+    Default model assumptions that can be customized per company.
+    These are used when historical data is insufficient.
+    """
+    # Depreciation
+    default_depreciation_years: float = 10.0
+    
+    # Tax rate (will try to calculate from historical data)
+    default_tax_rate: float = 0.21
+    
+    # Debt parameters
+    st_loan_years: float = 1.0  # Short-term loans are 1 year
+    lt_loan_years: float = 10.0  # Long-term loans are 10 years
+    
+    # Financing mix (70% debt, 30% equity for new financing needs)
+    pct_financing_with_debt: float = 0.70
+    
+    # Interest rates (real)
+    real_interest_rate: float = 0.02
+    risk_premium_debt: float = 0.04
+    risk_premium_st_investment: float = -0.01
+    
+    # Payout ratio (dividends / net income)
+    default_payout_ratio: float = 0.50
+    
+    # Working capital ratios (as % of revenue)
+    default_ar_pct: float = 0.08  # Accounts receivable
+    default_inventory_pct: float = 0.05  # Inventory
+    default_ap_pct: float = 0.10  # Accounts payable
+    
+    # Cash requirements (as % of revenue)
+    min_cash_pct_revenue: float = 0.04
+    
+    # Growth assumptions (if not calculated from historical)
+    default_revenue_growth: float = 0.03
+    default_inflation_rate: float = 0.025

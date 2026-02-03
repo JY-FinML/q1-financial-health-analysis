@@ -1,0 +1,38 @@
+{
+    "company_name": "The Coca-Cola Company",
+    "company_ticker": "KO",
+    "description": "Global beverage company with strong brand portfolio, consistent dividends, and stable margins",
+    
+    "_comment_fixed": "=== FIXED ASSUMPTIONS (Company Strategy/Policy) ===",
+    "_comment_backtest": "Backtest showed: SG&A overestimated 85-100% (historical avg misleading), LT Debt underestimated 23%",
+    "lt_loan_years": 12.0,
+    "st_loan_years": 1.0,
+    "pct_financing_with_debt": 0.80,
+    
+    "_comment_overrides": "=== OPTIONAL OVERRIDES (Set to null to use calculated values) ===",
+    "revenue_growth_override": null,
+    "tax_rate_override": null,
+    "payout_ratio_override": null,
+    "cogs_pct_override": null,
+    "sga_pct_override": null,
+    "capex_pct_override": null,
+    "cost_of_debt_override": null,
+    
+    "_comment_bounds": "=== BOUNDS FOR CALCULATED VALUES ===",
+    "min_revenue_growth": 0.00,
+    "max_revenue_growth": 0.08,
+    "min_tax_rate": 0.17,
+    "max_tax_rate": 0.22,
+    "min_depreciation_years": 12.0,
+    "max_depreciation_years": 20.0,
+    
+    "_comment_defaults": "=== FALLBACK DEFAULTS (Only used if historical data unavailable) ===",
+    "default_tax_rate": 0.21,
+    "default_revenue_growth": 0.03,
+    "default_payout_ratio": 0.75,
+    "default_ar_pct": 0.07,
+    "default_inventory_pct": 0.04,
+    "default_ap_pct": 0.10,
+    "default_depreciation_years": 12.0,
+    "default_inflation_rate": 0.025
+}

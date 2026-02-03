@@ -1,0 +1,38 @@
+{
+    "company_name": "Procter & Gamble",
+    "company_ticker": "PG",
+    "description": "Consumer goods company with stable dividend history and consistent capital structure",
+    
+    "_comment_fixed": "=== FIXED ASSUMPTIONS (Company Strategy/Policy) ===",
+    "_comment_backtest": "Backtest showed: COGS overestimated 7-9%, ST Debt error 82% (model reduces ST debt but company maintains high levels)",
+    "lt_loan_years": 10.0,
+    "st_loan_years": 1.0,
+    "pct_financing_with_debt": 0.75,
+    
+    "_comment_overrides": "=== OPTIONAL OVERRIDES (Set to null to use calculated values) ===",
+    "revenue_growth_override": null,
+    "tax_rate_override": null,
+    "payout_ratio_override": null,
+    "cogs_pct_override": null,
+    "sga_pct_override": null,
+    "capex_pct_override": null,
+    "cost_of_debt_override": null,
+    
+    "_comment_bounds": "=== BOUNDS FOR CALCULATED VALUES ===",
+    "min_revenue_growth": -0.03,
+    "max_revenue_growth": 0.20,
+    "min_tax_rate": 0.18,
+    "max_tax_rate": 0.25,
+    "min_depreciation_years": 15.0,
+    "max_depreciation_years": 22.0,
+    
+    "_comment_defaults": "=== FALLBACK DEFAULTS (Only used if historical data unavailable) ===",
+    "default_tax_rate": 0.21,
+    "default_revenue_growth": 0.02,
+    "default_payout_ratio": 0.65,
+    "default_ar_pct": 0.06,
+    "default_inventory_pct": 0.04,
+    "default_ap_pct": 0.12,
+    "default_depreciation_years": 12.0,
+    "default_inflation_rate": 0.025
+}

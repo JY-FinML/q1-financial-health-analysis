@@ -1,0 +1,38 @@
+{
+    "company_name": "Costco Wholesale",
+    "company_ticker": "COST",
+    "description": "Membership warehouse retailer with high inventory turnover and low margin, high volume model",
+    
+    "_comment_fixed": "=== FIXED ASSUMPTIONS (Company Strategy/Policy) ===",
+    "_comment_backtest": "Backtest showed: Operating Income underestimated 31%, Equity overestimated 20% (more buybacks than expected)",
+    "lt_loan_years": 12.0,
+    "st_loan_years": 1.0,
+    "pct_financing_with_debt": 0.35,
+    
+    "_comment_overrides": "=== OPTIONAL OVERRIDES (Set to null to use calculated values) ===",
+    "revenue_growth_override": null,
+    "tax_rate_override": null,
+    "payout_ratio_override": null,
+    "cogs_pct_override": null,
+    "sga_pct_override": null,
+    "capex_pct_override": null,
+    "cost_of_debt_override": null,
+    
+    "_comment_bounds": "=== BOUNDS FOR CALCULATED VALUES ===",
+    "min_revenue_growth": 0.04,
+    "max_revenue_growth": 0.10,
+    "min_tax_rate": 0.23,
+    "max_tax_rate": 0.28,
+    "min_depreciation_years": 18.0,
+    "max_depreciation_years": 25.0,
+    
+    "_comment_defaults": "=== FALLBACK DEFAULTS (Only used if historical data unavailable) ===",
+    "default_tax_rate": 0.25,
+    "default_revenue_growth": 0.06,
+    "default_payout_ratio": 0.30,
+    "default_ar_pct": 0.02,
+    "default_inventory_pct": 0.06,
+    "default_ap_pct": 0.08,
+    "default_depreciation_years": 15.0,
+    "default_inflation_rate": 0.025
+}
