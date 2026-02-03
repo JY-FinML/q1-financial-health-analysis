@@ -458,7 +458,7 @@ def _generate_full_output(forecaster, loader, display_years):
         ("  Retained Earnings", 'retained_earnings', forecaster.balance_sheet.retained_earnings),
         ("  Other Equity", 'other_equity', forecaster.balance_sheet.other_equity),
         ("Total Equity", 'total_equity', forecaster.balance_sheet.total_equity),
-        ("Minority Interest", 'minority_interest', None),
+        ("Minority Interest", 'minority_interest', forecaster.balance_sheet.minority_interest),
         ("", None, None),
         ("Total Liab & Equity", 'total_liabilities_equity', forecaster.balance_sheet.total_liabilities_equity),
         ("Balance Check (A - L - E - MI)", 'balance_check', forecaster.balance_sheet.balance_check),
