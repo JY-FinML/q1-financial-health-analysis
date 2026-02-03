@@ -1,28 +1,30 @@
 """
-P&G财务预测引擎
-使用现金预算法（与forecast_model相同的计算逻辑）：
+Generic Company Financial Forecasting Engine
+Uses the cash budget method (same calculation logic as forecast_model):
 Income Statement → Cash Budget → Debt Schedule → Balance Sheet
-确保资产负债表平衡
+Ensures balance sheet balances
 """
 from typing import Dict, List
-from .input_mapper import PGInputMapper
+from .input_mapper import CompanyInputMapper
 
 
-class PGForecaster:
+class CompanyForecaster:
     """
-    使用现金预算法的P&G预测器
-    确保资产负债表平衡
+    Generic company forecaster using the cash budget method
+    Ensures balance sheet balances
     """
     
-    def __init__(self):
-        # 获取映射后的输入
-        mapper = PGInputMapper()
+    def __init__(self, company_key: str):
+        # Get mapped inputs
+        self.company_key = company_key
+        mapper = CompanyInputMapper(company_key)
         self.inputs = mapper.get_forecast_inputs()
+        self.company_name = self.inputs.get('company_name', company_key)
         
-        # 预测结果存储
+        # Store forecast results
         self.years = list(range(self.inputs['forecast_years'] + 1))  # [0, 1, 2]
         
-        # 存储每年的财务报表
+        # Store financial statements for each year
         self.revenue = [0.0] * (len(self.years))
         self.cogs = [0.0] * len(self.years)
         self.gross_profit = [0.0] * len(self.years)
@@ -37,7 +39,7 @@ class PGForecaster:
         self.tax = [0.0] * len(self.years)
         self.net_income = [0.0] * len(self.years)
         
-        # 资产负债表项目
+        # Balance sheet items
         self.cash = [0.0] * len(self.years)
         self.ar = [0.0] * len(self.years)
         self.inventory = [0.0] * len(self.years)
@@ -69,7 +71,7 @@ class PGForecaster:
         self.stockholders_equity = [0.0] * len(self.years)
         self.total_equity = [0.0] * len(self.years)
         
-        # 现金流项目
+        # Cash flow items
         self.operating_cf = [0.0] * len(self.years)
         self.investing_cf = [0.0] * len(self.years)
         self.financing_cf = [0.0] * len(self.years)
@@ -77,17 +79,17 @@ class PGForecaster:
         self.dividends = [0.0] * len(self.years)
         self.free_cf = [0.0] * len(self.years)
         
-        # 股票回购
+        # Stock repurchases
         self.stock_repurchase = [0.0] * len(self.years)
         
-        # 初始化Year 0
+        # Initialize Year 0
         self._initialize_year_0()
     
     def _initialize_year_0(self):
-        """初始化Year 0（2023年实际值）"""
+        """Initialize Year 0 (actual values)"""
         bs0 = self.inputs['year_0_balance_sheet']
         
-        # 资产
+        # Assets
         self.cash[0] = bs0['cash']
         self.ar[0] = bs0['accounts_receivable']
         self.inventory[0] = bs0['inventory']
@@ -102,7 +104,7 @@ class PGForecaster:
         self.other_noncurrent_assets[0] = bs0['other_non_current_assets']
         self.total_assets[0] = bs0['total_assets']
         
-        # 负债
+        # Liabilities
         self.ap[0] = bs0['accounts_payable']
         self.st_debt[0] = bs0['short_term_debt']
         self.current_liabilities[0] = bs0['current_liabilities']
@@ -112,7 +114,7 @@ class PGForecaster:
         self.noncurrent_liabilities[0] = bs0['non_current_liabilities']
         self.total_liabilities[0] = bs0['total_liabilities']
         
-        # 权益
+        # Equity
         self.common_stock[0] = bs0['common_stock']
         self.apic[0] = bs0['additional_paid_in_capital']
         self.retained_earnings[0] = bs0['retained_earnings']
@@ -121,7 +123,7 @@ class PGForecaster:
         self.stockholders_equity[0] = bs0['stockholders_equity']
         self.total_equity[0] = bs0['total_equity']
         
-        # Year 0 利润表完整数据（2023年实际值）
+        # Year 0 complete income statement data (actual values)
         self.revenue[0] = self.inputs.get('year_0_revenue', 0)
         self.cogs[0] = self.inputs.get('year_0_cogs', 0)
         self.gross_profit[0] = self.inputs.get('year_0_gross_profit', 0)
@@ -135,113 +137,113 @@ class PGForecaster:
         self.tax[0] = self.inputs.get('year_0_tax', 0)
         self.net_income[0] = self.inputs.get('year_0_net_income', 0)
         
-        # Year 0 现金流数据
+        # Year 0 cash flow data
         self.operating_cf[0] = self.inputs.get('year_0_operating_cf', 0)
-        self.capex[0] = -abs(self.inputs.get('year_0_capex', 0))  # 负值
+        self.capex[0] = -abs(self.inputs.get('year_0_capex', 0))  # Negative value
         self.free_cf[0] = self.inputs.get('year_0_free_cf', 0)
-        self.dividends[0] = -abs(self.inputs.get('year_0_dividends', 0))  # 负值
+        self.dividends[0] = -abs(self.inputs.get('year_0_dividends', 0))  # Negative value
     
     def forecast_income_statement(self, year: int):
         """
-        预测利润表
-        year: 索引 (1 for 2024, 2 for 2025)
+        Forecast income statement
+        year: index (1 for 2024, 2 for 2025)
         """
-        # 1. 收入
+        # 1. Revenue
         self.revenue[year] = self.revenue[year-1] * (1 + self.inputs['nominal_revenue_growth'][year-1])
         
         # 2. COGS
         self.cogs[year] = self.cogs[year-1] * (1 + self.inputs['nominal_cogs_growth'][year-1])
         
-        # 3. 毛利润
+        # 3. Gross profit
         self.gross_profit[year] = self.revenue[year] - self.cogs[year]
         
-        # 4. 营业费用
+        # 4. Operating expenses
         self.operating_expenses[year] = self.operating_expenses[year-1] * (1 + self.inputs['nominal_opex_growth'][year-1])
         
         # 5. EBIT
         self.ebit[year] = self.gross_profit[year] - self.operating_expenses[year]
         
-        # 6. 折旧（基于上一年的Gross PPE）
+        # 6. Depreciation (based on prior year's Gross PPE)
         self.depreciation[year] = self.gross_ppe[year-1] * self.inputs['depreciation_rate']
         
         # 7. EBITDA
         self.ebitda[year] = self.ebit[year] + self.depreciation[year]
         
-        # 注意：利息在debt schedule之后计算
+        # Note: Interest is calculated after debt schedule
     
     def forecast_cash_budget_and_working_capital(self, year: int):
         """
-        预测营运资本和经营现金流
+        Forecast working capital and operating cash flow
         """
-        # 1. 应收账款（基于收入）
+        # 1. Accounts receivable (based on revenue)
         self.ar[year] = self.revenue[year] * (self.inputs['ar_days'] / 365)
         
-        # 2. 存货（基于COGS）
+        # 2. Inventory (based on COGS)
         self.inventory[year] = self.cogs[year] * (self.inputs['inventory_days'] / 365)
         
-        # 3. 应付账款（基于COGS）
+        # 3. Accounts payable (based on COGS)
         self.ap[year] = self.cogs[year] * (self.inputs['ap_days'] / 365)
         
-        # 4. 资本支出
+        # 4. Capital expenditures
         self.capex[year] = self.revenue[year] * self.inputs['capex_to_revenue']
         
         # 5. Gross PPE
         self.gross_ppe[year] = self.gross_ppe[year-1] + self.capex[year]
         
-        # 6. 累计折旧
+        # 6. Accumulated depreciation
         self.acc_depreciation[year] = self.acc_depreciation[year-1] + self.depreciation[year]
         
         # 7. Net PPE
         self.net_ppe[year] = self.gross_ppe[year] - self.acc_depreciation[year]
         
-        # 8. 经营现金流（简化）
+        # 8. Operating cash flow (simplified)
         change_in_ar = self.ar[year] - self.ar[year-1]
         change_in_inventory = self.inventory[year] - self.inventory[year-1]
         change_in_ap = self.ap[year] - self.ap[year-1]
         
-        # OCF = EBIT + 折旧 - 税 - 营运资本变动
-        # 注意：这里先不减税，税在计算net income时处理
+        # OCF = EBIT + depreciation - tax - working capital changes
+        # Note: Tax is handled when calculating net income, not deducted here
     
     def forecast_debt_and_financing(self, year: int):
         """
-        预测债务和融资
+        Forecast debt and financing
         """
-        # 1. 计算利息费用（基于上期债务）
+        # 1. Calculate interest expense (based on prior period debt)
         self.interest_expense[year] = (
             self.st_debt[year-1] * self.inputs['interest_rate_st'] +
             self.lt_debt[year-1] * self.inputs['interest_rate_lt']
         )
         
-        # 2. 利息收入（假设基于现金余额）
-        self.interest_income[year] = self.cash[year-1] * 0.02  # 假设2%收益率
+        # 2. Interest income (assume based on cash balance)
+        self.interest_income[year] = self.cash[year-1] * 0.02  # Assume 2% yield
         
-        # 3. 税前利润
+        # 3. Earnings before tax
         self.ebt[year] = self.ebit[year] - self.interest_expense[year] + self.interest_income[year]
         
-        # 4. 税
+        # 4. Tax
         self.tax[year] = max(0, self.ebt[year] * self.inputs['tax_rate'])
         
-        # 5. 净利润
+        # 5. Net income
         self.net_income[year] = self.ebt[year] - self.tax[year]
         
-        # 6. 股息
+        # 6. Dividends (based on historical dividend payout ratio)
         self.dividends[year] = self.net_income[year] * self.inputs['dividend_payout_ratio']
         
-        # 7. 留存收益
+        # 7. Stock repurchases (based on historical repurchase/net income ratio)
+        self.stock_repurchase[year] = self.net_income[year] * self.inputs.get('repurchase_to_ni_ratio', 0.3)
+        
+        # 8. Retained earnings (net income - dividends)
         self.retained_earnings[year] = self.retained_earnings[year-1] + self.net_income[year] - self.dividends[year]
         
-        # 8. 股票回购（基于2022-2023年历史平均）
-        self.stock_repurchase[year] = self.inputs.get('stock_repurchase', 5000)
-        
-        # 9. 库藏股
+        # 9. Treasury stock (accumulated repurchases)
         self.treasury_stock[year] = self.treasury_stock[year-1] + self.stock_repurchase[year]
         
-        # 10. 其他权益项保持稳定
+        # 10. Other equity items remain stable
         self.common_stock[year] = self.common_stock[year-1]
         self.apic[year] = self.apic[year-1]
         self.other_equity[year] = self.other_equity[year-1]
         
-        # 11. 股东权益
+        # 11. Stockholders' equity
         self.stockholders_equity[year] = (
             self.common_stock[year] +
             self.apic[year] +
@@ -250,22 +252,22 @@ class PGForecaster:
             self.other_equity[year]
         )
         
-        # 12. 总权益（假设少数股东权益稳定）
+        # 12. Total equity (assume minority interest is stable)
         minority_interest = self.total_equity[year-1] - self.stockholders_equity[year-1]
         self.total_equity[year] = self.stockholders_equity[year] + minority_interest
     
     def forecast_balance_sheet(self, year: int):
         """
-        预测资产负债表并确保平衡
-        使用现金流法：从上期现金开始，加上本期现金流变动
+        Forecast balance sheet and ensure it balances
+        Use cash flow method: start from prior period cash and add current period cash flow changes
         """
-        # 1. 无形资产（假设保持稳定或略微减少）
+        # 1. Intangible assets (assume stable or slightly decreasing)
         self.goodwill[year] = self.goodwill[year-1]
-        self.other_intangibles[year] = self.other_intangibles[year-1] * 0.98  # 假设每年摊销2%
+        self.other_intangibles[year] = self.other_intangibles[year-1] * 0.98  # Assume 2% amortization per year
         self.other_noncurrent_assets[year] = self.other_noncurrent_assets[year-1]
         
-        # 2. 计算本期现金流变动
-        # 经营活动现金流
+        # 2. Calculate current period cash flow changes
+        # Operating cash flow
         change_in_ar = self.ar[year] - self.ar[year-1]
         change_in_inventory = self.inventory[year] - self.inventory[year-1]
         change_in_ap = self.ap[year] - self.ap[year-1]
@@ -278,13 +280,13 @@ class PGForecaster:
             change_in_ap
         )
         
-        # 投资活动现金流（主要是资本支出）
+        # Investing cash flow (mainly capital expenditures)
         investing_cf = -self.capex[year]
         
-        # 融资活动现金流（股息+股票回购）
+        # Financing cash flow (dividends + stock repurchases)
         financing_cf = -(self.dividends[year] + self.stock_repurchase[year])
         
-        # 3. 计算期末现金（在调整债务前）
+        # 3. Calculate ending cash (before debt adjustments)
         preliminary_cash = (
             self.cash[year-1] +
             operating_cf +
@@ -292,18 +294,18 @@ class PGForecaster:
             financing_cf
         )
         
-        # 4. 债务管理策略
+        # 4. Debt management strategy
         min_cash = self.inputs['min_cash_balance']
         max_debt_to_equity = self.inputs['max_debt_to_equity']
         target_debt_structure = self.inputs['target_debt_structure']
         
-        # 初始化债务为上期值
+        # Initialize debt at prior period values
         self.lt_debt[year] = self.lt_debt[year-1]
         self.st_debt[year] = self.st_debt[year-1]
         self.total_debt[year] = self.lt_debt[year] + self.st_debt[year]
         
         if preliminary_cash < min_cash:
-            # 现金不足，需要借债
+            # Insufficient cash, need to borrow
             shortfall = min_cash - preliminary_cash
             lt_increase = shortfall * target_debt_structure
             st_increase = shortfall * (1 - target_debt_structure)
@@ -314,17 +316,17 @@ class PGForecaster:
             self.cash[year] = min_cash
             
         elif preliminary_cash > min_cash * 2.5:
-            # 现金过多，用于偿还债务
+            # Excess cash, use to pay down debt
             excess = preliminary_cash - min_cash * 1.5
             
-            # 检查债务权益比，如果低于目标，不偿还太多
+            # Check debt-to-equity ratio, don't pay down too much if below target
             current_debt_to_equity = self.total_debt[year] / self.stockholders_equity[year]
             
             if current_debt_to_equity > max_debt_to_equity * 0.5:
-                # 可以偿还一部分债务
-                debt_reduction = min(excess, self.total_debt[year] * 0.3)  # 最多偿还30%
+                # Can pay down some debt
+                debt_reduction = min(excess, self.total_debt[year] * 0.3)  # Maximum 30% repayment
                 
-                # 优先偿还短期债务
+                # Prioritize short-term debt repayment
                 st_reduction = min(debt_reduction * 0.4, self.st_debt[year])
                 lt_reduction = min(debt_reduction - st_reduction, self.lt_debt[year])
                 
@@ -333,25 +335,25 @@ class PGForecaster:
                 self.total_debt[year] = self.lt_debt[year] + self.st_debt[year]
                 self.cash[year] = preliminary_cash - (st_reduction + lt_reduction)
             else:
-                # 债务已经较低，保持现金
+                # Debt is already low, keep cash
                 self.cash[year] = preliminary_cash
         else:
-            # 现金合理，保持债务水平
+            # Cash is reasonable, maintain debt level
             self.cash[year] = preliminary_cash
         
-        # 5. 更新负债项
-        # 非流动负债（除债务外，假设保持相对稳定）
+        # 5. Update liability items
+        # Non-current liabilities (excluding debt, assume relatively stable)
         other_noncurrent_liab = self.noncurrent_liabilities[year-1] - self.lt_debt[year-1]
         self.noncurrent_liabilities[year] = self.lt_debt[year] + other_noncurrent_liab
         
-        # 流动负债（除债务和AP外，假设保持相对稳定）
+        # Current liabilities (excluding debt and AP, assume relatively stable)
         other_current_liab = self.current_liabilities[year-1] - self.st_debt[year-1] - self.ap[year-1]
         self.current_liabilities[year] = self.st_debt[year] + self.ap[year] + other_current_liab
         
-        # 6. 总负债
+        # 6. Total liabilities
         self.total_liabilities[year] = self.current_liabilities[year] + self.noncurrent_liabilities[year]
         
-        # 7. 计算总资产
+        # 7. Calculate total assets
         self.current_assets[year] = self.cash[year] + self.ar[year] + self.inventory[year]
         
         self.total_assets[year] = (
@@ -362,14 +364,14 @@ class PGForecaster:
             self.other_noncurrent_assets[year]
         )
         
-        # 8. 验证资产负债表平衡
-        # 资产 = 负债 + 权益
-        # 如果不平衡，调整现金使其平衡
+        # 8. Verify balance sheet balances
+        # Assets = Liabilities + Equity
+        # If imbalanced, adjust cash to balance
         required_total_assets = self.total_liabilities[year] + self.total_equity[year]
         imbalance = self.total_assets[year] - required_total_assets
         
-        if abs(imbalance) > 1:  # 容忍1M的误差
-            # 调整现金以平衡
+        if abs(imbalance) > 1:  # Tolerate 1M error
+            # Adjust cash to balance
             self.cash[year] -= imbalance
             self.current_assets[year] = self.cash[year] + self.ar[year] + self.inventory[year]
             self.total_assets[year] = (
@@ -381,8 +383,8 @@ class PGForecaster:
             )
     
     def _rebalance_balance_sheet(self, year: int):
-        """重新平衡资产负债表"""
-        # 更新负债
+        """Rebalance balance sheet"""
+        # Update liabilities
         other_noncurrent_liab = self.noncurrent_liabilities[year-1] - self.lt_debt[year-1]
         self.noncurrent_liabilities[year] = self.lt_debt[year] + other_noncurrent_liab
         
@@ -391,7 +393,7 @@ class PGForecaster:
         
         self.total_liabilities[year] = self.current_liabilities[year] + self.noncurrent_liabilities[year]
         
-        # 重新计算总资产和现金
+        # Recalculate total assets and cash
         required_total_assets = self.total_liabilities[year] + self.total_equity[year]
         
         assets_excluding_cash = (
@@ -408,27 +410,27 @@ class PGForecaster:
         self.current_assets[year] = self.cash[year] + self.ar[year] + self.inventory[year]
     
     def calculate_cash_flows(self, year: int):
-        """计算现金流量表"""
-        # 营运资本变动
+        """Calculate cash flow statement"""
+        # Working capital changes
         change_in_ar = self.ar[year] - self.ar[year-1]
         change_in_inventory = self.inventory[year] - self.inventory[year-1]
         change_in_ap = self.ap[year] - self.ap[year-1]
         change_in_wc = change_in_ar + change_in_inventory - change_in_ap
         
-        # 经营现金流
+        # Operating cash flow
         self.operating_cf[year] = (
             self.net_income[year] +
             self.depreciation[year] -
             change_in_wc
         )
         
-        # 投资现金流
+        # Investing cash flow
         self.investing_cf[year] = -self.capex[year]
         
-        # 自由现金流
+        # Free cash flow
         self.free_cf[year] = self.operating_cf[year] + self.investing_cf[year]
         
-        # 融资现金流
+        # Financing cash flow
         debt_change = self.total_debt[year] - self.total_debt[year-1]
         self.financing_cf[year] = (
             debt_change -
@@ -438,21 +440,21 @@ class PGForecaster:
     
     def run_forecast(self):
         """
-        运行完整预测
-        按照: Income Statement → Cash Budget → Debt → Balance Sheet 顺序
+        Run complete forecast
+        Following: Income Statement → Cash Budget → Debt → Balance Sheet sequence
         """
         print("\n" + "="*80)
-        print("P&G现金预算法预测 (使用forecast_model逻辑)")
+        print(f"{self.company_name}Cash Budget Method Forecast (using forecast_model logic)")
         print("="*80)
         
-        print(f"\nYear 0 (2023): 资产=${self.total_assets[0]:,.0f}M, "
-              f"负债=${self.total_liabilities[0]:,.0f}M, "
-              f"权益=${self.total_equity[0]:,.0f}M")
-        print(f"检查平衡: {abs(self.total_assets[0] - (self.total_liabilities[0] + self.total_equity[0])) < 1:.0f} ✓")
+        print(f"\nYear 0 (2023): Assets=${self.total_assets[0]:,.0f}M, "
+              f"Liabilities=${self.total_liabilities[0]:,.0f}M, "
+              f"Equity=${self.total_equity[0]:,.0f}M")
+        print(f"Check balance: {abs(self.total_assets[0] - (self.total_liabilities[0] + self.total_equity[0])) < 1:.0f} ✓")
         
         for year in range(1, len(self.years)):
             year_name = 2023 + year
-            print(f"\n预测 Year {year} ({year_name})...")
+            print(f"\nForecasting Year {year} ({year_name})...")
             
             # Step 1: Income Statement
             self.forecast_income_statement(year)
@@ -460,70 +462,180 @@ class PGForecaster:
             # Step 2: Cash Budget & Working Capital
             self.forecast_cash_budget_and_working_capital(year)
             
-            # Step 3: Debt & Financing (包括利息、税、净利润)
+            # Step 3: Debt & Financing (including interest, tax, net income)
             self.forecast_debt_and_financing(year)
             
-            # Step 4: Balance Sheet (确保平衡)
+            # Step 4: Balance Sheet (ensure balancing)
             self.forecast_balance_sheet(year)
             
             # Step 5: Cash Flows
             self.calculate_cash_flows(year)
             
-            # 验证平衡
+            # Verify balance
             balance_check = abs(self.total_assets[year] - (self.total_liabilities[year] + self.total_equity[year]))
             
-            print(f"  收入: ${self.revenue[year]:,.0f}M")
+            print(f"  Revenue: ${self.revenue[year]:,.0f}M")
             print(f"  EBIT: ${self.ebit[year]:,.0f}M")
-            print(f"  净利润: ${self.net_income[year]:,.0f}M")
-            print(f"  资产: ${self.total_assets[year]:,.0f}M")
-            print(f"  负债: ${self.total_liabilities[year]:,.0f}M")
-            print(f"  权益: ${self.total_equity[year]:,.0f}M")
-            print(f"  现金: ${self.cash[year]:,.0f}M")
-            print(f"  总债务: ${self.total_debt[year]:,.0f}M")
-            print(f"  资产负债表平衡差异: ${balance_check:,.2f}M {'✓' if balance_check < 1 else '✗'}")
+            print(f"  Net Income: ${self.net_income[year]:,.0f}M")
+            print(f"  Assets: ${self.total_assets[year]:,.0f}M")
+            print(f"  Liabilities: ${self.total_liabilities[year]:,.0f}M")
+            print(f"  Equity: ${self.total_equity[year]:,.0f}M")
+            print(f"  Cash: ${self.cash[year]:,.0f}M")
+            print(f"  Total Debt: ${self.total_debt[year]:,.0f}M")
+            print(f"  Balance Sheet Difference: ${balance_check:,.2f}M {'✓' if balance_check < 1 else '✗'}")
         
         print("\n" + "="*80)
-        print("预测完成！资产负债表已平衡。")
+        print(f"{self.company_name} Forecast Complete! Balance Sheet is Balanced.")
         print("="*80)
+        
+        # Print complete financial statements
+        self._print_detailed_statements()
+    
+    def _print_detailed_statements(self):
+        """Print complete income statement and balance sheet"""
+        for year in range(1, len(self.years)):
+            year_name = self.inputs['base_year'] + year
+            
+            print("\n" + "="*100)
+            print(f"{self.company_name} - Year {year} ({year_name}) Complete Financial Statements")
+            print("="*100)
+            
+            # Income statement
+            print("\n【Income Statement】")
+            print("-"*100)
+            print(f"{'Item':<30} {'Amount (Million USD)':>20}")
+            print("-"*100)
+            print(f"{'Revenue Revenue':<30} ${self.revenue[year]:>18,.0f}")
+            print(f"{'Cost of Goods Sold (COGS)':<30} ${self.cogs[year]:>18,.0f}")
+            print(f"{'Gross Profit':<30} ${self.gross_profit[year]:>18,.0f}")
+            print(f"{'Gross Margin':<30} {(self.gross_profit[year]/self.revenue[year]*100):>18.2f}%")
+            print(f"{'Operating Expenses':<30} ${self.operating_expenses[year]:>18,.0f}")
+            print(f"{'EBIT':<30} ${self.ebit[year]:>18,.0f}")
+            print(f"{'EBIT Margin':<30} {(self.ebit[year]/self.revenue[year]*100):>18.2f}%")
+            print(f"{'Depreciation':<30} ${self.depreciation[year]:>18,.0f}")
+            print(f"{'EBITDA':<30} ${self.ebitda[year]:>18,.0f}")
+            print(f"{'Interest Expense':<30} ${self.interest_expense[year]:>18,.0f}")
+            print(f"{'Interest Income':<30} ${self.interest_income[year]:>18,.0f}")
+            print(f"{'Earnings Before Tax (EBT)':<30} ${self.ebt[year]:>18,.0f}")
+            print(f"{'Income Tax':<30} ${self.tax[year]:>18,.0f}")
+            print(f"{'Effective Tax Rate':<30} {(self.tax[year]/self.ebt[year]*100 if self.ebt[year] != 0 else 0):>18.2f}%")
+            print(f"{'Net Income Net Income':<30} ${self.net_income[year]:>18,.0f}")
+            print(f"{'Net Margin':<30} {(self.net_income[year]/self.revenue[year]*100):>18.2f}%")
+            
+            # Balance sheet
+            print("\n[Balance Sheet]")
+            print("-"*100)
+            print(f"{'Item':<30} {'Amount (Million USD)':>20}")
+            print("-"*100)
+            print("[Assets Assets]")
+            print(f"{'  Cash Cash':<30} ${self.cash[year]:>18,.0f}")
+            print(f"{'  Accounts Receivable (AR)':<30} ${self.ar[year]:>18,.0f}")
+            print(f"{'  Inventory':<30} ${self.inventory[year]:>18,.0f}")
+            print(f"{'  Current Assets':<30} ${self.current_assets[year]:>18,.0f}")
+            calc_current_assets = self.cash[year] + self.ar[year] + self.inventory[year]
+            print(f"{'    (= Cash + AR + Inv)':<30} ${calc_current_assets:>18,.0f}")
+            print(f"{'  Gross PPE':<30} ${self.gross_ppe[year]:>18,.0f}")
+            print(f"{'  Accumulated Depreciation':<30} ${self.acc_depreciation[year]:>18,.0f}")
+            print(f"{'  Net PPE':<30} ${self.net_ppe[year]:>18,.0f}")
+            print(f"{'    (= Gross PPE - Acc Dep)':<30} ${(self.gross_ppe[year] - self.acc_depreciation[year]):>18,.0f}")
+            print(f"{'  Goodwill':<30} ${self.goodwill[year]:>18,.0f}")
+            print(f"{'  Other Intangibles':<30} ${self.other_intangibles[year]:>18,.0f}")
+            print(f"{'  Other Non-Current Assets':<30} ${self.other_noncurrent_assets[year]:>18,.0f}")
+            print(f"{'Total Assets':<30} ${self.total_assets[year]:>18,.0f}")
+            calc_total_assets = (self.current_assets[year] + self.net_ppe[year] + 
+                               self.goodwill[year] + self.other_intangibles[year] + 
+                               self.other_noncurrent_assets[year])
+            print(f"{'  (= CA + Net PPE + GW + OI + ONA)':<30} ${calc_total_assets:>18,.0f}")
+            
+            print("\n【Liabilities Liabilities】")
+            print(f"{'  Accounts Payable (AP)':<30} ${self.ap[year]:>18,.0f}")
+            print(f"{'  Short-Term Debt':<30} ${self.st_debt[year]:>18,.0f}")
+            other_current_liab = self.current_liabilities[year] - self.st_debt[year] - self.ap[year]
+            print(f"{'  Other Current Liabilities':<30} ${other_current_liab:>18,.0f}")
+            print(f"{'  Current Liabilities':<30} ${self.current_liabilities[year]:>18,.0f}")
+            calc_current_liab = self.st_debt[year] + self.ap[year] + other_current_liab
+            print(f"{'    (= ST Debt + AP + Other)':<30} ${calc_current_liab:>18,.0f}")
+            print(f"{'  Long-Term Debt':<30} ${self.lt_debt[year]:>18,.0f}")
+            other_noncurrent_liab = self.noncurrent_liabilities[year] - self.lt_debt[year]
+            print(f"{'  Other Non-Current Liabilities':<30} ${other_noncurrent_liab:>18,.0f}")
+            print(f"{'  Non-Current Liabilities':<30} ${self.noncurrent_liabilities[year]:>18,.0f}")
+            calc_noncurrent_liab = self.lt_debt[year] + other_noncurrent_liab
+            print(f"{'    (= LT Debt + Other)':<30} ${calc_noncurrent_liab:>18,.0f}")
+            print(f"{'  Total Debt Total Debt':<30} ${self.total_debt[year]:>18,.0f}")
+            print(f"{'    (= LT Debt + ST Debt)':<30} ${(self.lt_debt[year] + self.st_debt[year]):>18,.0f}")
+            print(f"{'Total Liabilities':<30} ${self.total_liabilities[year]:>18,.0f}")
+            calc_total_liab = self.current_liabilities[year] + self.noncurrent_liabilities[year]
+            print(f"{'  (= Current + Non-Current Liab)':<30} ${calc_total_liab:>18,.0f}")
+            
+            print("\n[Equity Equity]")
+            print(f"{'  Common Stock':<30} ${self.common_stock[year]:>18,.0f}")
+            print(f"{'  Additional Paid-In Capital (APIC)':<30} ${self.apic[year]:>18,.0f}")
+            print(f"{'  Retained Earnings':<30} ${self.retained_earnings[year]:>18,.0f}")
+            print(f"{'  Treasury Stock':<30} ${self.treasury_stock[year]:>18,.0f}")
+            print(f"{'  Other Equity':<30} ${self.other_equity[year]:>18,.0f}")
+            print(f"{'Stockholders Equity':<30} ${self.stockholders_equity[year]:>18,.0f}")
+            print(f"{'Total Equity':<30} ${self.total_equity[year]:>18,.0f}")
+            
+            print("\n[Balance Check]")
+            balance = self.total_assets[year] - self.total_liabilities[year] - self.total_equity[year]
+            print(f"{'Assets - Liabilities - Equity':<30} ${balance:>18,.2f} {'✓' if abs(balance) < 1 else '✗'}")
+            
+            print("\n[Key Financial Ratios]")
+            print("-"*100)
+            print(f"{'ROE (Net Income/Equity)':<30} {(self.net_income[year]/self.stockholders_equity[year]*100):>18.2f}%")
+            print(f"{'ROA (Net Income/Assets)':<30} {(self.net_income[year]/self.total_assets[year]*100):>18.2f}%")
+            print(f"{'Debt-to-Equity Ratio (D/E)':<30} {(self.total_debt[year]/self.stockholders_equity[year]):>18.2f}")
+            print(f"{'Current Ratio':<30} {(self.current_assets[year]/self.current_liabilities[year]):>18.2f}")
+            print(f"{'Debt-to-Assets Ratio (D/A)':<30} {(self.total_liabilities[year]/self.total_assets[year]*100):>18.2f}%")
+            
+            # Cash flow information
+            print("\n[Cash Flow Information]")
+            print("-"*100)
+            print(f"{'Operating Cash Flow':<30} ${self.operating_cf[year]:>18,.0f}")
+            print(f"{'Capital Expenditures (CapEx)':<30} ${self.capex[year]:>18,.0f}")
+            print(f"{'Free Cash Flow':<30} ${self.free_cf[year]:>18,.0f}")
+            print(f"{'Dividends':<30} ${self.dividends[year]:>18,.0f}")
+            print(f"{'Stock Repurchases':<30} ${self.stock_repurchase[year]:>18,.0f}")
+
     
     def print_detailed_balance_sheet(self, year: int):
-        """打印详细资产负债表"""
+        """Print detailed balance sheet"""
         year_name = 2023 + year
         print(f"\n{'='*80}")
-        print(f"资产负债表 - Year {year} ({year_name})")
+        print(f"Balance Sheet - Year {year} ({year_name})")
         print(f"{'='*80}")
         
-        print(f"\n【资产】")
-        print(f"现金: ${self.cash[year]:,.0f}M")
-        print(f"应收账款: ${self.ar[year]:,.0f}M")
-        print(f"存货: ${self.inventory[year]:,.0f}M")
-        print(f"流动资产: ${self.current_assets[year]:,.0f}M")
+        print(f"\n[Assets]")
+        print(f"Cash: ${self.cash[year]:,.0f}M")
+        print(f"Accounts Receivable: ${self.ar[year]:,.0f}M")
+        print(f"Inventory: ${self.inventory[year]:,.0f}M")
+        print(f"Current Assets: ${self.current_assets[year]:,.0f}M")
         print(f"\nGross PPE: ${self.gross_ppe[year]:,.0f}M")
-        print(f"累计折旧: ${self.acc_depreciation[year]:,.0f}M")
+        print(f"Accumulated Depreciation: ${self.acc_depreciation[year]:,.0f}M")
         print(f"Net PPE: ${self.net_ppe[year]:,.0f}M")
-        print(f"\n商誉: ${self.goodwill[year]:,.0f}M")
-        print(f"其他无形资产: ${self.other_intangibles[year]:,.0f}M")
-        print(f"其他非流动资产: ${self.other_noncurrent_assets[year]:,.0f}M")
-        print(f"\n总资产: ${self.total_assets[year]:,.0f}M")
+        print(f"\nGoodwill: ${self.goodwill[year]:,.0f}M")
+        print(f"Other Intangibles: ${self.other_intangibles[year]:,.0f}M")
+        print(f"Other Non-Current Assets: ${self.other_noncurrent_assets[year]:,.0f}M")
+        print(f"\nTotal Assets: ${self.total_assets[year]:,.0f}M")
         
-        print(f"\n【负债】")
-        print(f"应付账款: ${self.ap[year]:,.0f}M")
-        print(f"短期债务: ${self.st_debt[year]:,.0f}M")
-        print(f"流动负债: ${self.current_liabilities[year]:,.0f}M")
-        print(f"\n长期债务: ${self.lt_debt[year]:,.0f}M")
-        print(f"非流动负债: ${self.noncurrent_liabilities[year]:,.0f}M")
-        print(f"\n总负债: ${self.total_liabilities[year]:,.0f}M")
+        print(f"\n[Liabilities]")
+        print(f"Accounts Payable: ${self.ap[year]:,.0f}M")
+        print(f"Short-Term Debt: ${self.st_debt[year]:,.0f}M")
+        print(f"Current Liabilities: ${self.current_liabilities[year]:,.0f}M")
+        print(f"\nLong-Term Debt: ${self.lt_debt[year]:,.0f}M")
+        print(f"Non-Current Liabilities: ${self.noncurrent_liabilities[year]:,.0f}M")
+        print(f"\nTotal Liabilities: ${self.total_liabilities[year]:,.0f}M")
         
-        print(f"\n【股东权益】")
-        print(f"普通股: ${self.common_stock[year]:,.0f}M")
-        print(f"资本公积: ${self.apic[year]:,.0f}M")
-        print(f"留存收益: ${self.retained_earnings[year]:,.0f}M")
-        print(f"库藏股: ${self.treasury_stock[year]:,.0f}M")
-        print(f"其他权益: ${self.other_equity[year]:,.0f}M")
-        print(f"股东权益: ${self.stockholders_equity[year]:,.0f}M")
-        print(f"总权益: ${self.total_equity[year]:,.0f}M")
+        print(f"\n[Stockholders' Equity]")
+        print(f"Common Stock: ${self.common_stock[year]:,.0f}M")
+        print(f"Additional Paid-In Capital: ${self.apic[year]:,.0f}M")
+        print(f"Retained Earnings: ${self.retained_earnings[year]:,.0f}M")
+        print(f"Treasury Stock: ${self.treasury_stock[year]:,.0f}M")
+        print(f"Other Equity: ${self.other_equity[year]:,.0f}M")
+        print(f"Stockholders' Equity: ${self.stockholders_equity[year]:,.0f}M")
+        print(f"Total Equity: ${self.total_equity[year]:,.0f}M")
         
         print(f"\n{'='*80}")
-        print(f"验证: 资产 - (负债 + 权益) = "
+        print(f"Verification: Assets - (Liabilities + Equity) = "
               f"${self.total_assets[year] - (self.total_liabilities[year] + self.total_equity[year]):,.2f}M")
         print(f"{'='*80}")
