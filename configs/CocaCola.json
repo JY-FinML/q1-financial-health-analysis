@@ -4,10 +4,9 @@
     "description": "Global beverage company with strong brand portfolio, consistent dividends, and stable margins",
     
     "_comment_forecast": "=== FORECAST SETTINGS (User-defined) ===",
-    "base_year": null,
-    "n_forecast_years": 2,
+    "base_year": 2023,
+    "n_forecast_years": 1,
     "n_input_years": 3,
-    "is_backtest": false,
     
     "_comment_fixed": "=== FIXED ASSUMPTIONS (Company Strategy/Policy) ===",
     "lt_loan_years": 12.0,

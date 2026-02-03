@@ -4,10 +4,9 @@
     "description": "Global fast-food franchise with negative equity due to aggressive share buybacks and high leverage",
     
     "_comment_forecast": "=== FORECAST SETTINGS (User-defined) ===",
-    "base_year": null,
+    "base_year": 2022,
     "n_forecast_years": 2,
     "n_input_years": 3,
-    "is_backtest": false,
     
     "_comment_fixed": "=== FIXED ASSUMPTIONS (Company Strategy/Policy) ===",
     "lt_loan_years": 15.0,

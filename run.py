@@ -7,7 +7,7 @@ Unified command-line interface for all forecast operations.
 Usage:
     python run.py forecast ProcterGamble           # Standard forecast (latest year as base)
     python run.py forecast ProcterGamble --full    # Full detailed output
-    python run.py backtest ProcterGamble           # Backtest with config settings
+    python run.py forecast ProcterGamble --base-year 2023  # Backtest mode (auto-detected)
     python run.py config                           # View all company configs
     python run.py config ProcterGamble             # View specific company config
     python run.py list                             # List available companies
@@ -17,6 +17,8 @@ Options:
     --years N           Number of years to forecast (default: from config or 2)
     --full              Show full hierarchical output
     --no-save           Don't save report to file
+    
+Note: Backtest mode is AUTO-DETECTED when forecast years have actual data available.
 """
 
 import os
@@ -106,6 +108,34 @@ def run_forecast(company_name: str, base_year: str = None, n_forecast_years: int
     )
     forecaster.run_forecast()
     
+    # Build display years (always show 4 years: mix of actual + estimated)
+    min_display_years = 4
+    total_model_years = n_forecast_years + 1  # base year + forecast years
+    
+    display_years = []  # List of (year_str, is_estimated, data_index_or_none)
+    
+    # First, add historical years before base year (if needed to reach 4 years)
+    base_year_int = int(actual_base_year)
+    if total_model_years < min_display_years:
+        years_needed = min_display_years - total_model_years
+        for i in range(years_needed, 0, -1):
+            hist_year = str(base_year_int - i)
+            if hist_year in available_years:
+                display_years.append((hist_year, False, None))  # Actual, load from CSV
+    
+    # Add base year (actual data, index 0 in model)
+    display_years.append((actual_base_year, False, 0))
+    
+    # Add forecast years - these are ALWAYS "E" (Estimated) because they come from model
+    for i, fy in enumerate(forecast_years, 1):
+        # Forecast years are always marked as Estimated (E) - they are model predictions
+        display_years.append((fy, True, i))  # True = Estimated
+    
+    # If still less than 4 years, extend forecast years
+    while len(display_years) < min_display_years:
+        next_year = str(int(display_years[-1][0]) + 1)
+        display_years.append((next_year, True, None))  # Estimated but no model data
+    
     # Generate output
     lines = []
     lines.append("=" * 100)
@@ -118,14 +148,15 @@ def run_forecast(company_name: str, base_year: str = None, n_forecast_years: int
     lines.append(f"  Input Years Used:   {input_years_used}")
     lines.append(f"  Forecast Years:     {forecast_years}")
     lines.append(f"  Mode:               {'Backtest' if is_backtest else 'Forecast'}")
+    lines.append(f"  Display:            {[y[0] + ('E' if y[1] else 'A') for y in display_years]}")
     lines.append("")
     
     if full_output:
         # Full hierarchical output
-        lines.extend(_generate_full_output(forecaster, actual_base_year, forecast_years, n_forecast_years))
+        lines.extend(_generate_full_output(forecaster, loader, display_years))
     else:
         # Compact output
-        lines.extend(_generate_compact_output(forecaster, actual_base_year, forecast_years, n_forecast_years))
+        lines.extend(_generate_compact_output(forecaster, loader, display_years))
     
     # Add backtest comparison if applicable
     if is_backtest:
@@ -139,7 +170,7 @@ def run_forecast(company_name: str, base_year: str = None, n_forecast_years: int
     if save_report:
         mode_str = "backtest" if is_backtest else "forecast"
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        filename = f"{mode_str}_{company_name}_{timestamp}.txt"
+        filename = f"results/{mode_str}_{company_name}_{timestamp}.txt"
         with open(os.path.join(project_root, filename), 'w') as f:
             f.write(report)
         print(f"\nReport saved to: {filename}")
@@ -147,14 +178,52 @@ def run_forecast(company_name: str, base_year: str = None, n_forecast_years: int
     return report
 
 
-def _generate_compact_output(forecaster, base_year, forecast_years, n_forecast_years):
-    """Generate compact forecast output"""
+def _generate_compact_output(forecaster, loader, display_years):
+    """Generate compact forecast output with A/E labels
+    
+    Args:
+        forecaster: CompanyForecaster with model data
+        loader: DataLoader with actual CSV data
+        display_years: List of (year_str, is_estimated, model_index) tuples
+    """
     lines = []
     
-    # Header
-    header = f"{'Item':<30}" + f"{'Y0 (' + base_year + ')':>15}"
-    for i, y in enumerate(forecast_years, 1):
-        header += f"{'Y' + str(i) + ' (' + y + ')':>15}"
+    # CSV field mappings for loading actual data
+    is_csv_fields = {
+        'revenue': 'Total Revenue',
+        'cogs': 'Cost Of Revenue',
+        'gross_profit': 'Gross Profit',
+        'sga_expenses': 'Selling General And Administration',
+        'depreciation': 'Reconciled Depreciation',
+        'operating_income': 'Operating Income',
+        'interest_expense': 'Interest Expense',
+        'ebt': 'Pretax Income',
+        'income_taxes': 'Tax Provision',
+        'net_income': 'Net Income',
+        'dividends': 'Cash Dividends Paid',
+    }
+    
+    bs_csv_fields = {
+        'cash': 'Cash Cash Equivalents And Short Term Investments',
+        'accounts_receivable': 'Receivables',
+        'inventory': 'Inventory',
+        'current_assets': 'Current Assets',
+        'net_ppe': 'Net PPE',
+        'total_assets': 'Total Assets',
+        'accounts_payable': 'Payables And Accrued Expenses',
+        'short_term_debt': 'Current Debt And Capital Lease Obligation',
+        'long_term_debt': 'Long Term Debt And Capital Lease Obligation',
+        'total_liabilities': 'Total Liabilities Net Minority Interest',
+        'retained_earnings': 'Retained Earnings',
+        'total_equity': 'Stockholders Equity',
+        'total_liabilities_equity': 'Total Liabilities Net Minority Interest',  # Will calculate
+    }
+    
+    # Header with A/E labels
+    header = f"{'Item':<30}"
+    for year, is_est, _ in display_years:
+        label = f"{year}{'E' if is_est else 'A'}"
+        header += f"{label:>15}"
     
     # Income Statement
     lines.append("=" * 100)
@@ -178,10 +247,21 @@ def _generate_compact_output(forecaster, base_year, forecast_years, n_forecast_y
     ]
     
     for label, attr in is_items:
-        data = getattr(forecaster.income_statement, attr, [])
+        model_data = getattr(forecaster.income_statement, attr, [])
         row = f"{label:<30}"
-        for i in range(n_forecast_years + 1):
-            val = data[i] if i < len(data) else 0
+        for year, is_est, model_idx in display_years:
+            if model_idx is not None and model_idx < len(model_data):
+                val = model_data[model_idx]
+            else:
+                # Load from CSV for historical data
+                csv_field = is_csv_fields.get(attr)
+                if csv_field:
+                    val = loader.get_value('income', csv_field, year)
+                    if attr == 'dividends':
+                        val = loader.get_value('cash', csv_field, year)
+                    val = abs(val) if val else 0
+                else:
+                    val = 0
             row += f"{val:>15,.0f}"
         lines.append(row)
     
@@ -206,29 +286,101 @@ def _generate_compact_output(forecaster, base_year, forecast_years, n_forecast_y
         ('Total Liabilities', 'total_liabilities'),
         ('Retained Earnings', 'retained_earnings'),
         ('Total Equity', 'total_equity'),
+        ('Minority Interest', 'minority_interest'),
         ('Total Liab & Equity', 'total_liabilities_equity'),
         ('Balance Check', 'balance_check'),
     ]
     
     for label, attr in bs_items:
-        data = getattr(forecaster.balance_sheet, attr, [])
+        model_data = getattr(forecaster.balance_sheet, attr, [])
         row = f"{label:<30}"
-        for i in range(n_forecast_years + 1):
-            val = data[i] if i < len(data) else 0
+        for year, is_est, model_idx in display_years:
+            if model_idx is not None and model_idx < len(model_data):
+                val = model_data[model_idx]
+            else:
+                # Load from CSV for historical data
+                csv_field = bs_csv_fields.get(attr)
+                if csv_field and attr != 'balance_check':
+                    val = loader.get_value('balance', csv_field, year)
+                    val = val if val else 0
+                    # Calculate total_liabilities_equity
+                    if attr == 'total_liabilities_equity':
+                        liab = loader.get_value('balance', 'Total Liabilities Net Minority Interest', year) or 0
+                        eq = loader.get_value('balance', 'Stockholders Equity', year) or 0
+                        mi = loader.get_value('balance', 'Minority Interest', year) or 0
+                        val = liab + eq + mi
+                elif attr == 'balance_check':
+                    assets = loader.get_value('balance', 'Total Assets', year) or 0
+                    liab = loader.get_value('balance', 'Total Liabilities Net Minority Interest', year) or 0
+                    eq = loader.get_value('balance', 'Stockholders Equity', year) or 0
+                    mi = loader.get_value('balance', 'Minority Interest', year) or 0
+                    val = assets - liab - eq - mi
+                elif attr == 'minority_interest':
+                    val = loader.get_value('balance', 'Minority Interest', year) or 0
+                else:
+                    val = 0
             row += f"{val:>15,.0f}"
         lines.append(row)
     
     return lines
 
 
-def _generate_full_output(forecaster, base_year, forecast_years, n_forecast_years):
-    """Generate full hierarchical forecast output"""
+def _generate_full_output(forecaster, loader, display_years):
+    """Generate full hierarchical forecast output with A/E labels
+    
+    Args:
+        forecaster: CompanyForecaster with model data
+        loader: DataLoader with actual CSV data
+        display_years: List of (year_str, is_estimated, model_index) tuples
+    """
     lines = []
     
-    # Header
-    header = f"{'Item':<45}" + f"{'Y0 (' + base_year + ')':>15}"
-    for i, y in enumerate(forecast_years, 1):
-        header += f"{'Y' + str(i) + ' (' + y + ')':>15}"
+    # CSV field mappings
+    is_csv_fields = {
+        'revenue': ('income', 'Total Revenue'),
+        'cogs': ('income', 'Cost Of Revenue'),
+        'gross_profit': ('income', 'Gross Profit'),
+        'sga_expenses': ('income', 'Selling General And Administration'),
+        'depreciation': ('income', 'Reconciled Depreciation'),
+        'operating_income': ('income', 'Operating Income'),
+        'interest_expense': ('income', 'Interest Expense'),
+        'interest_income': ('income', 'Interest Income'),
+        'ebt': ('income', 'Pretax Income'),
+        'income_taxes': ('income', 'Tax Provision'),
+        'net_income': ('income', 'Net Income'),
+        'dividends': ('cash', 'Cash Dividends Paid'),
+    }
+    
+    bs_csv_fields = {
+        'cash': 'Cash Cash Equivalents And Short Term Investments',
+        'accounts_receivable': 'Receivables',
+        'inventory': 'Inventory',
+        'other_current_assets': 'Other Current Assets',
+        'current_assets': 'Current Assets',
+        'net_ppe': 'Net PPE',
+        'goodwill': 'Goodwill',
+        'intangible_assets': 'Other Intangible Assets',
+        'other_non_current_assets': 'Other Non Current Assets',
+        'total_non_current_assets': 'Total Non Current Assets',
+        'total_assets': 'Total Assets',
+        'accounts_payable': 'Payables And Accrued Expenses',
+        'short_term_debt': 'Current Debt And Capital Lease Obligation',
+        'other_current_liabilities': 'Other Current Liabilities',
+        'current_liabilities': 'Current Liabilities',
+        'long_term_debt': 'Long Term Debt And Capital Lease Obligation',
+        'other_non_current_liabilities': 'Other Non Current Liabilities',
+        'total_non_current_liabilities': 'Total Non Current Liabilities Net Minority Interest',
+        'total_liabilities': 'Total Liabilities Net Minority Interest',
+        'retained_earnings': 'Retained Earnings',
+        'other_equity': 'Capital Stock',
+        'total_equity': 'Stockholders Equity',
+    }
+    
+    # Header with A/E labels
+    header = f"{'Item':<45}"
+    for year, is_est, _ in display_years:
+        label = f"{year}{'E' if is_est else 'A'}"
+        header += f"{label:>15}"
     
     # Income Statement
     lines.append("=" * 120)
@@ -238,24 +390,35 @@ def _generate_full_output(forecaster, base_year, forecast_years, n_forecast_year
     lines.append("-" * 120)
     
     is_items = [
-        ("Revenue", forecaster.income_statement.revenue),
-        ("  Cost of Revenue", forecaster.income_statement.cogs),
-        ("Gross Profit", forecaster.income_statement.gross_profit),
-        ("  SG&A Expense", forecaster.income_statement.sga_expenses),
-        ("  Depreciation", forecaster.income_statement.depreciation),
-        ("Operating Income", forecaster.income_statement.operating_income),
-        ("  Interest Expense", forecaster.income_statement.interest_expense),
-        ("  Interest Income (ST Inv)", forecaster.income_statement.interest_income),
-        ("Pretax Income (EBT)", forecaster.income_statement.ebt),
-        ("  Tax Expense", forecaster.income_statement.income_taxes),
-        ("Net Income", forecaster.income_statement.net_income),
-        ("  Dividends", forecaster.income_statement.dividends),
+        ("Revenue", 'revenue'),
+        ("  Cost of Revenue", 'cogs'),
+        ("Gross Profit", 'gross_profit'),
+        ("  SG&A Expense", 'sga_expenses'),
+        ("  Depreciation", 'depreciation'),
+        ("Operating Income", 'operating_income'),
+        ("  Interest Expense", 'interest_expense'),
+        ("  Interest Income (ST Inv)", 'interest_income'),
+        ("Pretax Income (EBT)", 'ebt'),
+        ("  Tax Expense", 'income_taxes'),
+        ("Net Income", 'net_income'),
+        ("  Dividends", 'dividends'),
     ]
     
-    for label, values in is_items:
+    for label, attr in is_items:
+        model_data = getattr(forecaster.income_statement, attr, [])
         row = f"{label:<45}"
-        for i in range(n_forecast_years + 1):
-            val = values[i] if i < len(values) else 0
+        for year, is_est, model_idx in display_years:
+            if model_idx is not None and model_idx < len(model_data):
+                val = model_data[model_idx]
+            else:
+                # Load from CSV
+                csv_info = is_csv_fields.get(attr)
+                if csv_info:
+                    stmt, field = csv_info
+                    val = loader.get_value(stmt, field, year)
+                    val = abs(val) if val else 0
+                else:
+                    val = 0
             row += f"{val:>15,.0f}"
         lines.append(row)
     
@@ -268,48 +431,72 @@ def _generate_full_output(forecaster, base_year, forecast_years, n_forecast_year
     lines.append("-" * 120)
     
     bs_items = [
-        ("ASSETS", None),
-        ("  Cash & ST Investments", forecaster.balance_sheet.cash),
-        ("  Accounts Receivable", forecaster.balance_sheet.accounts_receivable),
-        ("  Inventory", forecaster.balance_sheet.inventory),
-        ("  Other Current Assets", forecaster.balance_sheet.other_current_assets),
-        ("Current Assets", forecaster.balance_sheet.current_assets),
-        ("  Net PP&E", forecaster.balance_sheet.net_ppe),
-        ("  Goodwill", forecaster.balance_sheet.goodwill),
-        ("  Intangible Assets", forecaster.balance_sheet.intangible_assets),
-        ("  Other Non-Current Assets", forecaster.balance_sheet.other_non_current_assets),
-        ("Total Non-Current Assets", forecaster.balance_sheet.total_non_current_assets),
-        ("Total Assets", forecaster.balance_sheet.total_assets),
-        ("", None),
-        ("LIABILITIES", None),
-        ("  Accounts Payable", forecaster.balance_sheet.accounts_payable),
-        ("  Short-term Debt", forecaster.balance_sheet.short_term_debt),
-        ("  Other Current Liabilities", forecaster.balance_sheet.other_current_liabilities),
-        ("Current Liabilities", forecaster.balance_sheet.current_liabilities),
-        ("  Long-term Debt", forecaster.balance_sheet.long_term_debt),
-        ("  Other Non-Current Liabilities", forecaster.balance_sheet.other_non_current_liabilities),
-        ("Total Non-Current Liabilities", forecaster.balance_sheet.total_non_current_liabilities),
-        ("Total Liabilities", forecaster.balance_sheet.total_liabilities),
-        ("", None),
-        ("EQUITY", None),
-        ("  Retained Earnings", forecaster.balance_sheet.retained_earnings),
-        ("  Other Equity", forecaster.balance_sheet.other_equity),
-        ("Total Equity", forecaster.balance_sheet.total_equity),
-        ("", None),
-        ("Total Liab & Equity", forecaster.balance_sheet.total_liabilities_equity),
-        ("Balance Check (A - L - E)", forecaster.balance_sheet.balance_check),
+        ("ASSETS", None, None),
+        ("  Cash & ST Investments", 'cash', forecaster.balance_sheet.cash),
+        ("  Accounts Receivable", 'accounts_receivable', forecaster.balance_sheet.accounts_receivable),
+        ("  Inventory", 'inventory', forecaster.balance_sheet.inventory),
+        ("  Other Current Assets", 'other_current_assets', forecaster.balance_sheet.other_current_assets),
+        ("Current Assets", 'current_assets', forecaster.balance_sheet.current_assets),
+        ("  Net PP&E", 'net_ppe', forecaster.balance_sheet.net_ppe),
+        ("  Goodwill", 'goodwill', forecaster.balance_sheet.goodwill),
+        ("  Intangible Assets", 'intangible_assets', forecaster.balance_sheet.intangible_assets),
+        ("  Other Non-Current Assets", 'other_non_current_assets', forecaster.balance_sheet.other_non_current_assets),
+        ("Total Non-Current Assets", 'total_non_current_assets', forecaster.balance_sheet.total_non_current_assets),
+        ("Total Assets", 'total_assets', forecaster.balance_sheet.total_assets),
+        ("", None, None),
+        ("LIABILITIES", None, None),
+        ("  Accounts Payable", 'accounts_payable', forecaster.balance_sheet.accounts_payable),
+        ("  Short-term Debt", 'short_term_debt', forecaster.balance_sheet.short_term_debt),
+        ("  Other Current Liabilities", 'other_current_liabilities', forecaster.balance_sheet.other_current_liabilities),
+        ("Current Liabilities", 'current_liabilities', forecaster.balance_sheet.current_liabilities),
+        ("  Long-term Debt", 'long_term_debt', forecaster.balance_sheet.long_term_debt),
+        ("  Other Non-Current Liabilities", 'other_non_current_liabilities', forecaster.balance_sheet.other_non_current_liabilities),
+        ("Total Non-Current Liabilities", 'total_non_current_liabilities', forecaster.balance_sheet.total_non_current_liabilities),
+        ("Total Liabilities", 'total_liabilities', forecaster.balance_sheet.total_liabilities),
+        ("", None, None),
+        ("EQUITY", None, None),
+        ("  Retained Earnings", 'retained_earnings', forecaster.balance_sheet.retained_earnings),
+        ("  Other Equity", 'other_equity', forecaster.balance_sheet.other_equity),
+        ("Total Equity", 'total_equity', forecaster.balance_sheet.total_equity),
+        ("Minority Interest", 'minority_interest', None),
+        ("", None, None),
+        ("Total Liab & Equity", 'total_liabilities_equity', forecaster.balance_sheet.total_liabilities_equity),
+        ("Balance Check (A - L - E - MI)", 'balance_check', forecaster.balance_sheet.balance_check),
     ]
     
-    for label, values in bs_items:
-        if values is None:
+    for label, attr, model_data in bs_items:
+        if attr is None:
+            # Section header or blank line
             if label:
                 lines.append(f"{label}")
             else:
                 lines.append("")
         else:
             row = f"{label:<45}"
-            for i in range(n_forecast_years + 1):
-                val = values[i] if i < len(values) else 0
+            for year, is_est, model_idx in display_years:
+                if model_data is not None and model_idx is not None and model_idx < len(model_data):
+                    val = model_data[model_idx]
+                else:
+                    # Load from CSV
+                    csv_field = bs_csv_fields.get(attr)
+                    if csv_field and attr not in ['balance_check', 'total_liabilities_equity']:
+                        val = loader.get_value('balance', csv_field, year)
+                        val = val if val else 0
+                    elif attr == 'total_liabilities_equity':
+                        liab = loader.get_value('balance', 'Total Liabilities Net Minority Interest', year) or 0
+                        eq = loader.get_value('balance', 'Stockholders Equity', year) or 0
+                        mi = loader.get_value('balance', 'Minority Interest', year) or 0
+                        val = liab + eq + mi
+                    elif attr == 'balance_check':
+                        assets = loader.get_value('balance', 'Total Assets', year) or 0
+                        liab = loader.get_value('balance', 'Total Liabilities Net Minority Interest', year) or 0
+                        eq = loader.get_value('balance', 'Stockholders Equity', year) or 0
+                        mi = loader.get_value('balance', 'Minority Interest', year) or 0
+                        val = assets - liab - eq - mi
+                    elif attr == 'minority_interest':
+                        val = loader.get_value('balance', 'Minority Interest', year) or 0
+                    else:
+                        val = 0
                 row += f"{val:>15,.0f}"
             lines.append(row)
     
@@ -317,45 +504,132 @@ def _generate_full_output(forecaster, base_year, forecast_years, n_forecast_year
 
 
 def _generate_backtest_comparison(forecaster, company_folder, base_year, forecast_years, n_forecast_years):
-    """Generate backtest comparison with actual data"""
+    """Generate backtest comparison with actual data, organized by year with full detail"""
     lines = []
     
     # Load full data
     full_loader = DataLoader(company_folder)
     full_loader.load_all()
     
-    lines.append("=" * 100)
+    lines.append("=" * 120)
     lines.append("BACKTEST COMPARISON (Forecast vs Actual)")
-    lines.append("=" * 100)
-    lines.append(f"{'Item':<25} {'Year':<8} {'Forecast':>12} {'Actual':>12} {'Diff':>10} {'Error%':>8}")
-    lines.append("-" * 100)
+    lines.append("=" * 120)
     
-    compare_items = [
-        ('Revenue', 'revenue', 'income', 'Total Revenue'),
-        ('Net Income', 'net_income', 'income', 'Net Income'),
-        ('Total Assets', 'total_assets', 'balance', 'Total Assets'),
-        ('Total Equity', 'total_equity', 'balance', 'Stockholders Equity'),
+    # Income Statement items (matching full detail output)
+    is_compare_items = [
+        ('Revenue', 'revenue', 'Total Revenue'),
+        ('  Cost of Revenue', 'cogs', 'Cost Of Revenue'),
+        ('Gross Profit', 'gross_profit', 'Gross Profit'),
+        ('  SG&A Expense', 'sga_expenses', 'Selling General And Administration'),
+        ('  Depreciation', 'depreciation', 'Reconciled Depreciation'),
+        ('Operating Income', 'operating_income', 'Operating Income'),
+        ('  Interest Expense', 'interest_expense', 'Interest Expense'),
+        ('Pretax Income (EBT)', 'ebt', 'Pretax Income'),
+        ('  Tax Expense', 'income_taxes', 'Tax Provision'),
+        ('Net Income', 'net_income', 'Net Income'),
     ]
     
-    errors = []
-    for label, attr, stmt, csv_field in compare_items:
-        forecast_data = getattr(
-            forecaster.income_statement if stmt == 'income' else forecaster.balance_sheet, 
-            attr, []
-        )
-        for i, year in enumerate(forecast_years, 1):
+    # Balance Sheet items (matching full detail output)
+    bs_compare_items = [
+        ('Cash & ST Investments', 'cash', 'Cash Cash Equivalents And Short Term Investments'),
+        ('Accounts Receivable', 'accounts_receivable', 'Receivables'),
+        ('Inventory', 'inventory', 'Inventory'),
+        ('Current Assets', 'current_assets', 'Current Assets'),
+        ('Net PP&E', 'net_ppe', 'Net PPE'),
+        ('Total Assets', 'total_assets', 'Total Assets'),
+        ('Accounts Payable', 'accounts_payable', 'Payables And Accrued Expenses'),
+        ('Short-term Debt', 'short_term_debt', 'Current Debt And Capital Lease Obligation'),
+        ('Current Liabilities', 'current_liabilities', 'Current Liabilities'),
+        ('Long-term Debt', 'long_term_debt', 'Long Term Debt And Capital Lease Obligation'),
+        ('Total Liabilities', 'total_liabilities', 'Total Liabilities Net Minority Interest'),
+        ('Retained Earnings', 'retained_earnings', 'Retained Earnings'),
+        ('Total Equity', 'total_equity', 'Stockholders Equity'),
+    ]
+    
+    all_year_errors = {}  # {year: {'is': [], 'bs': []}}
+    
+    # Display by year
+    for i, year in enumerate(forecast_years, 1):
+        lines.append("")
+        lines.append(f"{'='*120}")
+        lines.append(f"YEAR {i} ({year})")
+        lines.append(f"{'='*120}")
+        
+        year_is_errors = []
+        year_bs_errors = []
+        
+        # Income Statement comparison
+        lines.append("")
+        lines.append("INCOME STATEMENT")
+        lines.append(f"{'Item':<35} {'Forecast':>15} {'Actual':>15} {'Diff':>12} {'Error%':>10}")
+        lines.append("-" * 90)
+        
+        for label, attr, csv_field in is_compare_items:
+            forecast_data = getattr(forecaster.income_statement, attr, [])
             forecast_val = forecast_data[i] if i < len(forecast_data) else 0
-            actual_val = full_loader.get_value(stmt, csv_field, year)
+            actual_val = full_loader.get_value('income', csv_field, year)
             
             if actual_val is not None and actual_val != 0:
                 diff = forecast_val - actual_val
                 error_pct = (diff / abs(actual_val)) * 100
-                errors.append(abs(error_pct))
-                lines.append(f"{label:<25} {year:<8} {forecast_val:>12,.0f} {actual_val:>12,.0f} {diff:>10,.0f} {error_pct:>7.1f}%")
+                year_is_errors.append(abs(error_pct))
+                lines.append(f"{label:<35} {forecast_val:>15,.0f} {actual_val:>15,.0f} {diff:>12,.0f} {error_pct:>9.1f}%")
+            else:
+                lines.append(f"{label:<35} {forecast_val:>15,.0f} {'N/A':>15} {'N/A':>12} {'N/A':>10}")
+        
+        if year_is_errors:
+            lines.append("-" * 90)
+            lines.append(f"{'Income Statement Avg Error:':<35} {sum(year_is_errors)/len(year_is_errors):>52.1f}%")
+        
+        # Balance Sheet comparison
+        lines.append("")
+        lines.append("BALANCE SHEET")
+        lines.append(f"{'Item':<35} {'Forecast':>15} {'Actual':>15} {'Diff':>12} {'Error%':>10}")
+        lines.append("-" * 90)
+        
+        for label, attr, csv_field in bs_compare_items:
+            forecast_data = getattr(forecaster.balance_sheet, attr, [])
+            forecast_val = forecast_data[i] if i < len(forecast_data) else 0
+            actual_val = full_loader.get_value('balance', csv_field, year)
+            
+            if actual_val is not None and actual_val != 0:
+                diff = forecast_val - actual_val
+                error_pct = (diff / abs(actual_val)) * 100
+                year_bs_errors.append(abs(error_pct))
+                lines.append(f"{label:<35} {forecast_val:>15,.0f} {actual_val:>15,.0f} {diff:>12,.0f} {error_pct:>9.1f}%")
+            else:
+                lines.append(f"{label:<35} {forecast_val:>15,.0f} {'N/A':>15} {'N/A':>12} {'N/A':>10}")
+        
+        if year_bs_errors:
+            lines.append("-" * 90)
+            lines.append(f"{'Balance Sheet Avg Error:':<35} {sum(year_bs_errors)/len(year_bs_errors):>52.1f}%")
+        
+        # Store errors for summary
+        all_errors = year_is_errors + year_bs_errors
+        if all_errors:
+            all_year_errors[year] = {
+                'is': sum(year_is_errors)/len(year_is_errors) if year_is_errors else 0,
+                'bs': sum(year_bs_errors)/len(year_bs_errors) if year_bs_errors else 0,
+                'total': sum(all_errors)/len(all_errors)
+            }
     
-    if errors:
-        lines.append("-" * 100)
-        lines.append(f"Average Absolute Error: {sum(errors)/len(errors):.1f}%")
+    # Summary across all years
+    lines.append("")
+    lines.append("=" * 120)
+    lines.append("ERROR SUMMARY BY YEAR")
+    lines.append("=" * 120)
+    lines.append(f"{'Year':<10} {'Income Stmt':>15} {'Balance Sheet':>15} {'Overall':>15}")
+    lines.append("-" * 60)
+    
+    for year, errors in all_year_errors.items():
+        lines.append(f"{year:<10} {errors['is']:>14.1f}% {errors['bs']:>14.1f}% {errors['total']:>14.1f}%")
+    
+    if all_year_errors:
+        avg_is = sum(e['is'] for e in all_year_errors.values()) / len(all_year_errors)
+        avg_bs = sum(e['bs'] for e in all_year_errors.values()) / len(all_year_errors)
+        avg_total = sum(e['total'] for e in all_year_errors.values()) / len(all_year_errors)
+        lines.append("-" * 60)
+        lines.append(f"{'Average':<10} {avg_is:>14.1f}% {avg_bs:>14.1f}% {avg_total:>14.1f}%")
     
     # Balance Sheet Check
     lines.append("")
@@ -493,30 +767,24 @@ def main():
 Examples:
   python run.py forecast ProcterGamble           # Standard forecast
   python run.py forecast ProcterGamble --full    # Full detailed output
-  python run.py backtest ProcterGamble           # Run backtest
+  python run.py forecast ProcterGamble --base-year 2023  # Backtest (auto-detected)
   python run.py config                           # View all configs
   python run.py config ProcterGamble             # View specific config
   python run.py list                             # List companies
+
+Note: Backtest mode is automatically enabled when forecast years have actual data.
         """
     )
     
     subparsers = parser.add_subparsers(dest='command', help='Command to run')
     
     # Forecast command
-    forecast_parser = subparsers.add_parser('forecast', help='Run forecast')
+    forecast_parser = subparsers.add_parser('forecast', help='Run forecast (auto-detects backtest mode)')
     forecast_parser.add_argument('company', help='Company name')
     forecast_parser.add_argument('--base-year', type=int, help='Override base year')
     forecast_parser.add_argument('--years', type=int, help='Number of forecast years')
     forecast_parser.add_argument('--full', action='store_true', help='Full hierarchical output')
     forecast_parser.add_argument('--no-save', action='store_true', help='Do not save report')
-    
-    # Backtest command (alias for forecast with older base year)
-    backtest_parser = subparsers.add_parser('backtest', help='Run backtest')
-    backtest_parser.add_argument('company', help='Company name')
-    backtest_parser.add_argument('--base-year', type=int, help='Override base year')
-    backtest_parser.add_argument('--years', type=int, help='Number of forecast years')
-    backtest_parser.add_argument('--full', action='store_true', help='Full hierarchical output')
-    backtest_parser.add_argument('--no-save', action='store_true', help='Do not save report')
     
     # Config command
     config_parser = subparsers.add_parser('config', help='View configurations')
@@ -527,7 +795,7 @@ Examples:
     
     args = parser.parse_args()
     
-    if args.command == 'forecast' or args.command == 'backtest':
+    if args.command == 'forecast':
         run_forecast(
             args.company,
             base_year=args.base_year,

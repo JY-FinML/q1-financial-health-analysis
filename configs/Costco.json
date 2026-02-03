@@ -4,10 +4,9 @@
     "description": "Membership warehouse retailer with high inventory turnover and low margin, high volume model",
     
     "_comment_forecast": "=== FORECAST SETTINGS (User-defined) ===",
-    "base_year": null,
+    "base_year": 2023,
     "n_forecast_years": 2,
     "n_input_years": 3,
-    "is_backtest": false,
     
     "_comment_fixed": "=== FIXED ASSUMPTIONS (Company Strategy/Policy) ===",
     "lt_loan_years": 12.0,
