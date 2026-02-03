@@ -3,8 +3,13 @@
     "company_ticker": "KO",
     "description": "Global beverage company with strong brand portfolio, consistent dividends, and stable margins",
     
+    "_comment_forecast": "=== FORECAST SETTINGS (User-defined) ===",
+    "base_year": null,
+    "n_forecast_years": 2,
+    "n_input_years": 3,
+    "is_backtest": false,
+    
     "_comment_fixed": "=== FIXED ASSUMPTIONS (Company Strategy/Policy) ===",
-    "_comment_backtest": "Backtest showed: SG&A overestimated 85-100% (historical avg misleading), LT Debt underestimated 23%",
     "lt_loan_years": 12.0,
     "st_loan_years": 1.0,
     "pct_financing_with_debt": 0.80,

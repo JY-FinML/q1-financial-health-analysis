@@ -60,6 +60,23 @@ class CompanyConfig:
     description: str = ""
     
     # ==========================================
+    # FORECAST SETTINGS (User-defined)
+    # ==========================================
+    
+    # Base year for forecast (Year 0). Set to null/None to use latest available year.
+    # For backtest: set to an earlier year (e.g., "2023" to test forecast against 2024-2025 actuals)
+    base_year: Optional[str] = None
+    
+    # Number of years to forecast (default: 2)
+    n_forecast_years: int = 2
+    
+    # Number of historical years to use for calculating ratios (default: 3)
+    n_input_years: int = 3
+    
+    # Is this a backtest run? If True, will compare forecast with actual data
+    is_backtest: bool = False
+    
+    # ==========================================
     # FIXED ASSUMPTIONS (Minimal - Strategy/Policy based)
     # Only 3 fixed assumptions needed!
     # ==========================================
@@ -138,6 +155,11 @@ class CompanyConfig:
             'company_name': self.company_name,
             'company_ticker': self.company_ticker,
             'description': self.description,
+            # Forecast settings
+            'base_year': self.base_year,
+            'n_forecast_years': self.n_forecast_years,
+            'n_input_years': self.n_input_years,
+            'is_backtest': self.is_backtest,
             # Fixed assumptions
             'lt_loan_years': self.lt_loan_years,
             'st_loan_years': self.st_loan_years,

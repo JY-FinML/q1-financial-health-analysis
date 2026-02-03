@@ -3,8 +3,13 @@
     "company_ticker": "MCD",
     "description": "Global fast-food franchise with negative equity due to aggressive share buybacks and high leverage",
     
+    "_comment_forecast": "=== FORECAST SETTINGS (User-defined) ===",
+    "base_year": null,
+    "n_forecast_years": 2,
+    "n_input_years": 3,
+    "is_backtest": false,
+    
     "_comment_fixed": "=== FIXED ASSUMPTIONS (Company Strategy/Policy) ===",
-    "_comment_backtest": "Backtest showed: Cash error 305% (company reduced cash significantly), Revenue underestimated 9-11% in Mode1",
     "lt_loan_years": 15.0,
     "st_loan_years": 1.0,
     "pct_financing_with_debt": 0.95,

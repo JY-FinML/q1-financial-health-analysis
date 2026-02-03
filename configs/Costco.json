@@ -3,8 +3,13 @@
     "company_ticker": "COST",
     "description": "Membership warehouse retailer with high inventory turnover and low margin, high volume model",
     
+    "_comment_forecast": "=== FORECAST SETTINGS (User-defined) ===",
+    "base_year": null,
+    "n_forecast_years": 2,
+    "n_input_years": 3,
+    "is_backtest": false,
+    
     "_comment_fixed": "=== FIXED ASSUMPTIONS (Company Strategy/Policy) ===",
-    "_comment_backtest": "Backtest showed: Operating Income underestimated 31%, Equity overestimated 20% (more buybacks than expected)",
     "lt_loan_years": 12.0,
     "st_loan_years": 1.0,
     "pct_financing_with_debt": 0.35,
