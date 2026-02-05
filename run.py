@@ -66,7 +66,7 @@ def run_forecast(company_name: str, base_year: str = None, n_forecast_years: int
     
     n_input_years = config.n_input_years if config else 3
     
-    company_folder = os.path.join(project_root, "data", company_name)
+    company_folder = os.path.join(project_root, "data/financial_statements", company_name)
     
     # Load data to check available years
     loader = DataLoader(company_folder)
