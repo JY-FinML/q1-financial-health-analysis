@@ -51,4 +51,5 @@ def save_statements(symbols, group_name):
             df_to_save.to_csv(file_path)
             print(f"Saved {file_path}")
 
-save_statements(['KO','COST', 'MCD', 'PG'], "")
+if __name__ == "__main__":
+    save_statements(['KO','COST', 'MCD', 'PG'], "")
